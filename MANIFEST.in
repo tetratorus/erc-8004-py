@@ -1,0 +1,6 @@
+include README.md
+include SPEC.md
+include requirements.txt
+include requirements-dev.txt
+recursive-include src/erc8004/abis *.json
+recursive-include docs *.md
