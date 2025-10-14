@@ -170,7 +170,27 @@ def main():
     for i, score in enumerate(all_feedback["scores"]):
         print(f"   [{i}] Client: {all_feedback['clientAddresses'][i][:10]}... Score: {score}")
 
-    print("\n🎉 All tests completed successfully!")
+    # Step 11: Revoke the first feedback
+    print("\n📋 Step 11: Revoking first feedback...")
+    revoke_result = client_sdk.reputation.revoke_feedback(agent_id, 1)
+    print("✅ Feedback revoked!")
+    print(f"   TX Hash: {revoke_result['txHash']}\n")
+
+    # Step 12: Verify feedback is revoked
+    print("📋 Step 12: Verifying revoked feedback...")
+    revoked_feedback = client_sdk.reputation.read_feedback(agent_id, client_address, 1)
+    print("✅ Revoked feedback status:")
+    print(f"   Score: {revoked_feedback['score']} / 100")
+    print(f"   Revoked: {revoked_feedback['isRevoked']}\n")
+
+    # Step 13: Get summary after revoke (should exclude revoked feedback)
+    print("📋 Step 13: Getting summary after revoke...")
+    final_summary = client_sdk.reputation.get_summary(agent_id)
+    print("✅ Final reputation summary (excluding revoked):")
+    print(f"   Feedback Count: {final_summary['count']}")
+    print(f"   Average Score: {final_summary['averageScore']} / 100\n")
+
+    print("🎉 All tests completed successfully!")
 
 
 if __name__ == "__main__":
