@@ -121,7 +121,8 @@ class ValidationStatus(TypedDict):
     validatorAddress: str
     agentId: int
     response: int  # 0-100
-    tag: NotRequired[str]  # OPTIONAL (bytes32)
+    responseHash: str  # bytes32 (may be empty/zero for older deployments)
+    tag: str  # bytes32 (may be empty/zero)
     lastUpdate: int
 
 

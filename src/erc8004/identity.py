@@ -113,21 +113,21 @@ class IdentityClient:
         """
         return self.adapter.call(self.contract_address, self.abi, "tokenURI", [agent_id])
 
-    def set_token_uri(self, agent_id: int, uri: str) -> Dict[str, str]:
+    def set_agent_uri(self, agent_id: int, new_uri: str) -> Dict[str, str]:
         """
         Set the token URI for an agent
         Note: This is an implementation-specific extension (not in base spec).
-        Assumes implementation exposes setTokenURI with owner/operator checks.
+        Assumes implementation exposes setAgentUri with owner/operator checks.
 
         Args:
             agent_id: The agent's ID
-            uri: New URI string
+            new_uri: New URI string
 
         Returns:
             Dictionary with txHash
         """
         result = self.adapter.send(
-            self.contract_address, self.abi, "setTokenURI", [agent_id, uri]
+            self.contract_address, self.abi, "setAgentUri", [agent_id, new_uri]
         )
 
         return {"txHash": result["txHash"]}

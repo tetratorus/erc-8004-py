@@ -124,7 +124,7 @@ class ValidationClient:
     def get_validation_status(self, request_hash: str) -> ValidationStatus:
         """
         Get validation status for a request
-        Spec: function getValidationStatus(bytes32 requestHash) returns (address validatorAddress, uint256 agentId, uint8 response, bytes32 tag, uint256 lastUpdate)
+        Spec: function getValidationStatus(bytes32 requestHash) returns (address validatorAddress, uint256 agentId, uint8 response, bytes32 responseHash, bytes32 tag, uint256 lastUpdate)
 
         Args:
             request_hash: The request hash (bytes32)
@@ -136,13 +136,29 @@ class ValidationClient:
             self.contract_address, self.abi, "getValidationStatus", [request_hash]
         )
 
-        return {
-            "validatorAddress": result[0],
-            "agentId": int(result[1]),
-            "response": int(result[2]),
-            "tag": result[3].hex() if isinstance(result[3], bytes) else result[3],
-            "lastUpdate": int(result[4]),
-        }
+        # Backward compatibility: handle both old (5 values) and new (6 values) contracts
+        # Old: (validatorAddress, agentId, response, tag, lastUpdate)
+        # New: (validatorAddress, agentId, response, responseHash, tag, lastUpdate)
+        if len(result) == 5:
+            # Old contract without responseHash
+            return {
+                "validatorAddress": result[0],
+                "agentId": int(result[1]),
+                "response": int(result[2]),
+                "responseHash": "0x" + "00" * 32,  # Empty bytes32
+                "tag": result[3].hex() if isinstance(result[3], bytes) else result[3],
+                "lastUpdate": int(result[4]),
+            }
+        else:
+            # New contract with responseHash
+            return {
+                "validatorAddress": result[0],
+                "agentId": int(result[1]),
+                "response": int(result[2]),
+                "responseHash": result[3].hex() if isinstance(result[3], bytes) else result[3],
+                "tag": result[4].hex() if isinstance(result[4], bytes) else result[4],
+                "lastUpdate": int(result[5]),
+            }
 
     def get_summary(
         self,

@@ -121,12 +121,12 @@ class ReputationClient:
         feedback_auth: str,
         tag1: Optional[str] = None,
         tag2: Optional[str] = None,
-        fileuri: Optional[str] = None,
-        filehash: Optional[str] = None,
+        feedback_uri: Optional[str] = None,
+        feedback_hash: Optional[str] = None,
     ) -> Dict[str, str]:
         """
         Submit feedback for an agent
-        Spec: function giveFeedback(uint256 agentId, uint8 score, bytes32 tag1, bytes32 tag2, string calldata fileuri, bytes32 calldata filehash, bytes memory feedbackAuth)
+        Spec: function giveFeedback(uint256 agentId, uint8 score, bytes32 tag1, bytes32 tag2, string calldata feedbackUri, bytes32 calldata feedbackHash, bytes memory feedbackAuth)
 
         Args:
             agent_id: The agent ID
@@ -134,8 +134,8 @@ class ReputationClient:
             feedback_auth: Signed feedbackAuth
             tag1: OPTIONAL tag (will be hashed to bytes32)
             tag2: OPTIONAL tag (will be hashed to bytes32)
-            fileuri: OPTIONAL file URI
-            filehash: OPTIONAL file hash (bytes32)
+            feedback_uri: OPTIONAL feedback URI
+            feedback_hash: OPTIONAL feedback hash (bytes32)
 
         Returns:
             Dictionary with txHash
@@ -147,8 +147,8 @@ class ReputationClient:
         # Convert optional string parameters to bytes32 (or empty bytes32 if not provided)
         tag1_bytes = Web3.keccak(text=tag1) if tag1 else bytes(32)
         tag2_bytes = Web3.keccak(text=tag2) if tag2 else bytes(32)
-        filehash_bytes = bytes.fromhex(filehash[2:]) if filehash else bytes(32)
-        fileuri_str = fileuri or ""
+        feedback_hash_bytes = bytes.fromhex(feedback_hash[2:]) if feedback_hash else bytes(32)
+        feedback_uri_str = feedback_uri or ""
 
         result = self.adapter.send(
             self.contract_address,
@@ -159,8 +159,8 @@ class ReputationClient:
                 score,
                 tag1_bytes,
                 tag2_bytes,
-                fileuri_str,
-                filehash_bytes,
+                feedback_uri_str,
+                feedback_hash_bytes,
                 bytes.fromhex(feedback_auth[2:]),
             ],
         )

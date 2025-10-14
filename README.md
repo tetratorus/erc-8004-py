@@ -106,7 +106,7 @@ client.reputation.give_feedback(
     score=95,  # 0-100
     tag1='excellent-service',
     tag2='fast-response',
-    fileuri='ipfs://QmFeedbackData',
+    feedback_uri='ipfs://QmFeedbackData',
     feedback_auth=signed_auth,
 )
 
@@ -283,7 +283,7 @@ Handles agent registration and identity management.
 - `register_with_uri(uri)` - Register with token URI
 - `register_with_metadata(uri, metadata)` - Register with URI and metadata
 - `get_token_uri(agent_id)` - Get token URI
-- `set_token_uri(agent_id, uri)` - Set token URI
+- `set_agent_uri(agent_id, new_uri)` - Set token URI
 - `get_owner(agent_id)` - Get agent owner
 - `get_metadata(agent_id, key)` - Get on-chain metadata
 - `set_metadata(agent_id, key, value)` - Set on-chain metadata

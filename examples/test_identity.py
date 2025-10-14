@@ -58,7 +58,7 @@ def main():
 
         # Set the tokenURI after registration
         new_uri = "ipfs://QmNewAgent456"
-        client.identity.set_token_uri(result1["agentId"], new_uri)
+        client.identity.set_agent_uri(result1["agentId"], new_uri)
         print(f"✅ Set tokenURI to: {new_uri}")
 
         # Verify it was set
