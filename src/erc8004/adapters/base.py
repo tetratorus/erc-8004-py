@@ -1,6 +1,6 @@
 """
 Adapter interface for blockchain interactions
-Allows SDK to work with any blockchain library (Web3.py, Brownie, etc.)
+Allows SDK to work with any blockchain library (Web3.py, etc.)
 """
 
 from abc import ABC, abstractmethod

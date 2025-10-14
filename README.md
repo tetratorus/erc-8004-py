@@ -10,7 +10,7 @@ ERC-8004 enables trustless agent economies through three core registries:
 - **Reputation Registry** - Feedback and reputation scoring system
 - **Validation Registry** - Independent validation and verification hooks
 
-This SDK provides a simple, type-safe interface to interact with ERC-8004 contracts using **Web3.py** (and optionally eth-brownie).
+This SDK provides a simple, type-safe interface to interact with ERC-8004 contracts using **Web3.py**.
 
 ## Installation
 
@@ -221,9 +221,8 @@ python examples/test_ipfs.py
 The SDK uses an adapter pattern to support multiple blockchain libraries:
 
 - **Web3Adapter** - For Web3.py v6+
-- **BrownieAdapter** - For eth-brownie (coming soon)
 
-Both adapters implement the same `BlockchainAdapter` interface, making them fully interchangeable.
+Additional adapters can be implemented by extending the `BlockchainAdapter` interface.
 
 ## Development
 

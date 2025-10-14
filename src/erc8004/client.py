@@ -4,7 +4,7 @@ ERC-8004 Trustless Agents Client
 This SDK makes ZERO assumptions about implementations beyond what the spec says.
 All "MAY" fields in the spec are treated as optional, not mandatory.
 
-Uses adapter pattern to support any blockchain library (Web3.py, Brownie, etc.)
+Uses adapter pattern to support any blockchain library (Web3.py, etc.)
 
 Usage example:
 ```python
@@ -43,7 +43,7 @@ class ERC8004Client:
         Initialize ERC-8004 Client
 
         Args:
-            adapter: Blockchain adapter instance (Web3Adapter, BrownieAdapter, etc.)
+            adapter: Blockchain adapter instance (Web3Adapter, etc.)
             addresses: Contract addresses configuration
         """
         self.adapter = adapter
