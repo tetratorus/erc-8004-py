@@ -24,10 +24,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Contract addresses - Sepolia Proxy addresses
-IDENTITY_REGISTRY = "0x8004a6090Cd10A7288092483047B097295Fb8847"
-REPUTATION_REGISTRY = "0x8004B8FD1A363aa02fDC07635C0c5F94f6Af5B7E"
-VALIDATION_REGISTRY = "0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5"
+# Contract addresses
+IDENTITY_REGISTRY = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+REPUTATION_REGISTRY = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+VALIDATION_REGISTRY = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 
 # Example agent registration data
 agent_data = {
@@ -43,7 +43,7 @@ agent_data = {
         },
         {
             "name": "agentWallet",
-            "endpoint": "eip155:11155111:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7",
+            "endpoint": "eip155:31337:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7",
         },
     ],
     "registrations": [],
@@ -141,21 +141,20 @@ def main():
 
         print("📝 Registering agent with IPFS URI...")
 
-        # Setup blockchain connection (Sepolia)
-        sepolia_rpc = os.getenv("SEPOLIA_RPC_URL", "")
-        private_key = os.getenv("SEPOLIA_TESTNET_PRIVATE_KEY_1", "")
+        # Setup blockchain connection (local Hardhat)
+        provider_url = os.getenv("RPC_URL", "http://127.0.0.1:8545")
+        private_key = os.getenv(
+            "PRIVATE_KEY",
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",  # Hardhat default account
+        )
 
-        if not sepolia_rpc or not private_key:
-            print("⚠️  Blockchain credentials not found")
-            print("   Set SEPOLIA_RPC_URL and SEPOLIA_TESTNET_PRIVATE_KEY_1 to register agent")
+        w3 = Web3(Web3.HTTPProvider(provider_url))
+
+        if not w3.is_connected():
+            print("⚠️  Could not connect to local blockchain")
+            print("   Make sure Hardhat node is running: npx hardhat node")
             print("   Skipping blockchain registration...\n")
         else:
-            w3 = Web3(Web3.HTTPProvider(sepolia_rpc))
-
-            if not w3.is_connected():
-                print("❌ Error: Failed to connect to Sepolia")
-                return
-
             adapter = Web3Adapter(w3, private_key=private_key)
             client = ERC8004Client(
                 adapter=adapter,
@@ -163,7 +162,7 @@ def main():
                     "identityRegistry": IDENTITY_REGISTRY,
                     "reputationRegistry": REPUTATION_REGISTRY,
                     "validationRegistry": VALIDATION_REGISTRY,
-                    "chainId": 11155111,  # Sepolia chain ID
+                    "chainId": 31337,  # Hardhat chain ID
                 },
             )
 
@@ -172,7 +171,6 @@ def main():
             print("✅ Agent registered!")
             print(f"   Agent ID: {registration['agentId']}")
             print(f"   Transaction: {registration['txHash']}")
-            print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{registration['txHash']}")
             print()
 
             # ============================================
@@ -288,14 +286,18 @@ def complete_agent_lifecycle():
 
     # 4. Register on blockchain
     print("📝 Step 2: Registering agent on blockchain...")
-    sepolia_rpc = os.getenv("SEPOLIA_RPC_URL", "")
-    private_key = os.getenv("SEPOLIA_TESTNET_PRIVATE_KEY_1", "")
+    provider_url = os.getenv("RPC_URL", "http://127.0.0.1:8545")
+    private_key = os.getenv(
+        "PRIVATE_KEY",
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    )
 
-    if not sepolia_rpc or not private_key:
-        print("   ⚠️  Skipping blockchain steps (credentials not found)")
+    w3 = Web3(Web3.HTTPProvider(provider_url))
+
+    if not w3.is_connected():
+        print("   ⚠️  Could not connect to blockchain")
         return
 
-    w3 = Web3(Web3.HTTPProvider(sepolia_rpc))
     adapter = Web3Adapter(w3, private_key=private_key)
     client = ERC8004Client(
         adapter=adapter,
@@ -303,7 +305,7 @@ def complete_agent_lifecycle():
             "identityRegistry": IDENTITY_REGISTRY,
             "reputationRegistry": REPUTATION_REGISTRY,
             "validationRegistry": VALIDATION_REGISTRY,
-            "chainId": 11155111,
+            "chainId": 31337,
         },
     )
 
@@ -354,14 +356,18 @@ def discover_agent(agent_id: int):
         )
     )
 
-    sepolia_rpc = os.getenv("SEPOLIA_RPC_URL", "")
-    private_key = os.getenv("SEPOLIA_TESTNET_PRIVATE_KEY_1", "")
+    provider_url = os.getenv("RPC_URL", "http://127.0.0.1:8545")
+    private_key = os.getenv(
+        "PRIVATE_KEY",
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    )
 
-    if not sepolia_rpc or not private_key:
-        print("❌ Blockchain credentials not found")
+    w3 = Web3(Web3.HTTPProvider(provider_url))
+
+    if not w3.is_connected():
+        print("❌ Could not connect to blockchain")
         return
 
-    w3 = Web3(Web3.HTTPProvider(sepolia_rpc))
     adapter = Web3Adapter(w3, private_key=private_key)
     client = ERC8004Client(
         adapter=adapter,
@@ -369,7 +375,7 @@ def discover_agent(agent_id: int):
             "identityRegistry": IDENTITY_REGISTRY,
             "reputationRegistry": REPUTATION_REGISTRY,
             "validationRegistry": VALIDATION_REGISTRY,
-            "chainId": 11155111,
+            "chainId": 31337,
         },
     )
 
