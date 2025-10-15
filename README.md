@@ -193,7 +193,7 @@ Main client with three sub-clients:
 ## Links
 
 - [ERC-8004 Specification](https://eips.ethereum.org/EIPS/eip-8004)
-- [GitHub Repository](https://github.com/tetratorus/sdk)
+- [GitHub Repository](https://github.com/tetratorus/erc-8004-py)
 
 ## License
 
