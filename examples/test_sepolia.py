@@ -27,10 +27,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Contract addresses from ChaosChain deployment
-IDENTITY_REGISTRY = "0x7177a6867296406881E20d6647232314736Dd09A"
-REPUTATION_REGISTRY = "0xB5048e3ef1DA4E04deB6f7d0423D06F63869e322"
-VALIDATION_REGISTRY = "0x662b40A526cb4017d947e71eAF6753BF3eeE66d8"
+# Contract addresses - Sepolia Proxy addresses
+IDENTITY_REGISTRY = "0x8004a6090Cd10A7288092483047B097295Fb8847"
+REPUTATION_REGISTRY = "0x8004B8FD1A363aa02fDC07635C0c5F94f6Af5B7E"
+VALIDATION_REGISTRY = "0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5"
 
 # Base58 alphabet for CIDv0 encoding
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -123,8 +123,8 @@ def main():
         },
     )
 
-    # Test 1: Register agent with URI and metadata
-    print("Test 1: Register agent with URI and on-chain metadata")
+    # Register a single agent to use for all tests
+    print("Registering agent with URI and on-chain metadata...")
     try:
         registration_uri = f"ipfs://{generate_random_cidv0()}"
         metadata = [
@@ -132,45 +132,37 @@ def main():
             {"key": "agentWallet", "value": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7"}
         ]
 
-        result1 = client.identity.register_with_metadata(registration_uri, metadata)
-        print(f"✅ Registered agent ID: {result1['agentId']}")
-        print(f"   TX Hash: {result1['txHash']}")
-        print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{result1['txHash']}")
-        print(f"   Owner: {client.identity.get_owner(result1['agentId'])}")
-        print(f"   URI: {client.identity.get_token_uri(result1['agentId'])}")
+        result = client.identity.register_with_metadata(registration_uri, metadata)
+        agent_id = result['agentId']
+        print(f"✅ Registered agent ID: {agent_id}")
+        print(f"   TX Hash: {result['txHash']}")
+        print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{result['txHash']}")
+        print(f"   Owner: {client.identity.get_owner(agent_id)}")
+        print(f"   URI: {client.identity.get_token_uri(agent_id)}")
 
         # Read back metadata
-        agent_name = client.identity.get_metadata(result1["agentId"], "agentName")
-        agent_wallet = client.identity.get_metadata(result1["agentId"], "agentWallet")
+        agent_name = client.identity.get_metadata(agent_id, "agentName")
+        agent_wallet = client.identity.get_metadata(agent_id, "agentWallet")
         print(f"   Metadata - agentName: {agent_name}")
         print(f"   Metadata - agentWallet: {agent_wallet}\n")
     except Exception as error:
-        print(f"❌ Error: {error}\n")
+        print(f"❌ Error: {error}")
+        return
 
-    # Test 2: Set metadata after registration
-    print("Test 2: Set metadata after registration")
+    # Test 1: Set metadata after registration
+    print("Test 1: Set metadata after registration")
     try:
-        result2 = client.identity.register()
-        print(f"✅ Registered agent ID: {result2['agentId']}")
-        print(f"   TX Hash: {result2['txHash']}")
-        print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{result2['txHash']}")
-
-        set_metadata_result = client.identity.set_metadata(result2["agentId"], "status", "active")
-        status = client.identity.get_metadata(result2["agentId"], "status")
+        set_metadata_result = client.identity.set_metadata(agent_id, "status", "active")
+        status = client.identity.get_metadata(agent_id, "status")
         print(f"   Set metadata - status: {status}")
         print(f"   TX Hash: {set_metadata_result['txHash']}")
         print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{set_metadata_result['txHash']}\n")
     except Exception as error:
         print(f"❌ Error: {error}\n")
 
-    # Test 3: Create feedbackAuth and submit feedback
-    print("Test 3: Create feedbackAuth and submit feedback")
+    # Test 2: Create feedbackAuth and submit feedback
+    print("Test 2: Create feedbackAuth and submit feedback")
     try:
-        result3 = client.identity.register()
-        agent_id = result3["agentId"]
-        print(f"✅ Registered agent ID: {agent_id}")
-        print(f"   TX Hash: {result3['txHash']}")
-        print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{result3['txHash']}")
 
         # Get chain ID
         chain_id = client.get_chain_id()
@@ -227,15 +219,11 @@ def main():
     except Exception as error:
         print(f"❌ Error: {error}\n")
 
-    # Test 4: Validation workflow
-    print("Test 4: Validation workflow")
+    # Test 3: Validation workflow
+    print("Test 3: Validation workflow")
     try:
-        # Register a new agent for validation testing
-        result4 = client.identity.register()
-        validation_agent_id = result4["agentId"]
-        print(f"✅ Registered agent ID for validation: {validation_agent_id}")
-        print(f"   TX Hash: {result4['txHash']}")
-        print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{result4['txHash']}")
+        # Use the same agent for validation testing
+        print(f"Using agent ID for validation: {agent_id}")
 
         # Generate a random IPFS CID for the validation request
         validation_cid = generate_random_cidv0()
@@ -245,7 +233,7 @@ def main():
         # Request validation from feedback giver (acting as validator)
         request_result = client.validation.validation_request(
             feedback_giver_address,
-            validation_agent_id,
+            agent_id,
             request_uri,
             request_hash,
         )
@@ -255,6 +243,16 @@ def main():
         print(f"   Request Hash: {request_result['requestHash']}")
         print(f"   TX Hash: {request_result['txHash']}")
         print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{request_result['txHash']}")
+
+        # Wait for 1 block confirmation before submitting validation response
+        print(f"⏳ Waiting for 1 block confirmation...")
+        request_block = w3.eth.get_transaction(request_result['txHash'])['blockNumber']
+        while True:
+            current_block = w3.eth.block_number
+            if current_block >= request_block + 1:
+                print(f"✅ Block confirmed (current: {current_block}, request: {request_block})")
+                break
+            time.sleep(2)  # Wait 2 seconds before checking again
 
         # Validator (feedback giver) provides response
         response_uri = f"ipfs://{generate_random_cidv0()}"
@@ -281,13 +279,13 @@ def main():
         print(f"   Last Update: {status['lastUpdate']}")
 
         # Get validation summary for agent
-        validation_summary = client.validation.get_summary(validation_agent_id, [feedback_giver_address])
+        validation_summary = client.validation.get_summary(agent_id, [feedback_giver_address])
         print(f"✅ Validation summary:")
         print(f"   Validation Count: {validation_summary['count']}")
         print(f"   Average Response: {validation_summary['avgResponse']} / 100")
 
         # Get all validation requests for agent
-        agent_validations = client.validation.get_agent_validations(validation_agent_id)
+        agent_validations = client.validation.get_agent_validations(agent_id)
         print(f"✅ Agent validations retrieved:")
         print(f"   Total validations: {len(agent_validations)}")
         for i, req_hash in enumerate(agent_validations):

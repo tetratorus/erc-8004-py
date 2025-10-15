@@ -1,141 +1,494 @@
 """
-Example script to test IPFS functionality
+Example: IPFS Upload and Pinning
 
-This example demonstrates:
-- Uploading JSON data to IPFS
-- Fetching content from IPFS
-- Converting CIDs to bytes32
-- Using different IPFS providers
+This example demonstrates how to use the IPFS client to:
+- Upload files and JSON data to IPFS
+- Pin content to keep it available
+- Fetch content from IPFS
+- Register agents with IPFS-hosted metadata
 """
 
 import os
-
+import json
+from erc8004 import (
+    IPFSClientConfig,
+    cid_to_bytes32,
+    create_ipfs_client,
+    ipfs_uri_to_bytes32,
+    ERC8004Client,
+    Web3Adapter,
+)
+from web3 import Web3
 from dotenv import load_dotenv
-
-from erc8004 import IPFSClientConfig, cid_to_bytes32, create_ipfs_client, ipfs_uri_to_bytes32
 
 # Load environment variables
 load_dotenv()
 
+# Contract addresses - Sepolia Proxy addresses
+IDENTITY_REGISTRY = "0x8004a6090Cd10A7288092483047B097295Fb8847"
+REPUTATION_REGISTRY = "0x8004B8FD1A363aa02fDC07635C0c5F94f6Af5B7E"
+VALIDATION_REGISTRY = "0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5"
+
+# Example agent registration data
+agent_data = {
+    "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+    "name": "My AI Agent",
+    "description": "An autonomous agent for task automation",
+    "image": "https://example.com/agent-avatar.png",
+    "endpoints": [
+        {
+            "name": "A2A",
+            "endpoint": "https://agent.example.com/.well-known/agent-card.json",
+            "version": "0.3.0",
+        },
+        {
+            "name": "agentWallet",
+            "endpoint": "eip155:11155111:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7",
+        },
+    ],
+    "registrations": [],
+    "supportedTrust": ["reputation", "crypto-economic"],
+}
+
 
 def main():
-    print("🚀 ERC-8004 IPFS Test\n")
+    print("🚀 IPFS Upload & Pinning Example\n")
 
-    # Test 1: CID conversion utilities
-    print("📋 Test 1: CID to bytes32 conversion")
-    try:
-        test_cid = "QmR7GSQM93Cx5eAg6a6yRzNde1FQv7uL6X1o4k7zrJa3LX"
-        bytes32_hash = cid_to_bytes32(test_cid)
-        print(f"✅ CID: {test_cid}")
-        print(f"   Bytes32: {bytes32_hash}\n")
+    # ============================================
+    # 1. Setup IPFS Client
+    # ============================================
 
-        test_uri = f"ipfs://{test_cid}"
-        bytes32_from_uri = ipfs_uri_to_bytes32(test_uri)
-        print(f"✅ URI: {test_uri}")
-        print(f"   Bytes32: {bytes32_from_uri}\n")
-
-        assert bytes32_hash == bytes32_from_uri, "Conversion mismatch!"
-        print("✅ Conversions match!\n")
-    except Exception as error:
-        print(f"❌ Error: {error}\n")
-
-    # Test 2: Upload JSON to IPFS (using Pinata as example)
-    print("📋 Test 2: Upload JSON to IPFS")
-
-    # Check if Pinata credentials are available
+    # Option 1: Using Pinata (recommended for production)
     pinata_key = os.getenv("PINATA_API_KEY")
     pinata_secret = os.getenv("PINATA_API_SECRET")
 
     if not pinata_key or not pinata_secret:
         print("⚠️  Pinata credentials not found in environment variables")
-        print("   Set PINATA_API_KEY and PINATA_API_SECRET to test uploads")
-        print("   For now, we'll demonstrate with fetch only\n")
-    else:
-        try:
-            # Create IPFS client
-            config = IPFSClientConfig(
-                provider="pinata",
-                api_key=pinata_key,
-                api_secret=pinata_secret,
-            )
-            ipfs = create_ipfs_client(config)
+        print("   Set PINATA_API_KEY and PINATA_API_SECRET to run this example")
+        return
 
-            # Upload agent registration data
-            agent_data = {
-                "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
-                "name": "Python Test Agent",
-                "description": "An agent registered using the Python SDK",
-                "image": "https://example.com/agent.png",
-                "endpoints": [
-                    {
-                        "name": "A2A",
-                        "endpoint": "https://agent.example/.well-known/agent-card.json",
-                        "version": "0.3.0",
-                    }
-                ],
-                "supportedTrust": ["reputation", "validation"],
+    pinata_config = IPFSClientConfig(
+        provider="pinata",
+        api_key=pinata_key,
+        api_secret=pinata_secret,
+        gateway_url="https://gateway.pinata.cloud/ipfs/",  # Optional custom gateway
+    )
+
+    # Option 2: Using NFT.Storage
+    # nft_storage_config = IPFSClientConfig(
+    #     provider="nftstorage",
+    #     api_key=os.getenv("NFT_STORAGE_KEY", "your-nft-storage-key"),
+    #     gateway_url="https://nftstorage.link/ipfs/",
+    # )
+
+    # Option 3: Using Web3.Storage
+    # web3_storage_config = IPFSClientConfig(
+    #     provider="web3storage",
+    #     api_key=os.getenv("WEB3_STORAGE_KEY", "your-web3-storage-key"),
+    # )
+
+    # Option 4: Using local IPFS node
+    # local_ipfs_config = IPFSClientConfig(
+    #     provider="ipfs",
+    #     node_url="http://127.0.0.1:5001",  # Your local IPFS daemon
+    #     gateway_url="http://127.0.0.1:8080/ipfs/",
+    # )
+
+    # Create client (using Pinata for this example)
+    ipfs = create_ipfs_client(pinata_config)
+
+    # ============================================
+    # 2. Upload JSON Data (Agent Registration)
+    # ============================================
+
+    print("📤 Uploading agent registration data to IPFS...")
+    try:
+        result = ipfs.upload_json(
+            agent_data,
+            name="my-agent-registration.json",
+            metadata={"project": "erc-8004-py", "type": "agent-registration"},
+        )
+
+        print("✅ Upload successful!")
+        print(f"   CID: {result.cid}")
+        print(f"   URI: {result.uri}")
+        print(f"   Gateway URL: {result.url}")
+        if result.size:
+            print(f"   Size: {result.size} bytes")
+        print()
+
+        # ============================================
+        # 3. Fetch Content from IPFS
+        # ============================================
+
+        print("📥 Fetching content from IPFS...")
+        fetched_data = ipfs.fetch_json(result.cid)
+        print(f"✅ Fetched agent name: {fetched_data['name']}")
+        print()
+
+        # ============================================
+        # 4. Pin Content (keep it available)
+        # ============================================
+
+        print("📌 Pinning content to ensure availability...")
+        ipfs.pin(result.cid, name="my-agent-registration")
+        print("✅ Content pinned successfully!")
+        print()
+
+        # ============================================
+        # 5. Register Agent with IPFS URI
+        # ============================================
+
+        print("📝 Registering agent with IPFS URI...")
+
+        # Setup blockchain connection (Sepolia)
+        sepolia_rpc = os.getenv("SEPOLIA_RPC_URL", "")
+        private_key = os.getenv("SEPOLIA_TESTNET_PRIVATE_KEY_1", "")
+
+        if not sepolia_rpc or not private_key:
+            print("⚠️  Blockchain credentials not found")
+            print("   Set SEPOLIA_RPC_URL and SEPOLIA_TESTNET_PRIVATE_KEY_1 to register agent")
+            print("   Skipping blockchain registration...\n")
+        else:
+            w3 = Web3(Web3.HTTPProvider(sepolia_rpc))
+
+            if not w3.is_connected():
+                print("❌ Error: Failed to connect to Sepolia")
+                return
+
+            adapter = Web3Adapter(w3, private_key=private_key)
+            client = ERC8004Client(
+                adapter=adapter,
+                addresses={
+                    "identityRegistry": IDENTITY_REGISTRY,
+                    "reputationRegistry": REPUTATION_REGISTRY,
+                    "validationRegistry": VALIDATION_REGISTRY,
+                    "chainId": 11155111,  # Sepolia chain ID
+                },
+            )
+
+            # Register agent with IPFS URI
+            registration = client.identity.register_with_uri(result.uri)
+            print("✅ Agent registered!")
+            print(f"   Agent ID: {registration['agentId']}")
+            print(f"   Transaction: {registration['txHash']}")
+            print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{registration['txHash']}")
+            print()
+
+            # ============================================
+            # 6. Fetch Agent from Registry & Parse IPFS Data
+            # ============================================
+
+            print("🔍 Fetching agent from registry...")
+
+            # Get the agent's token URI from the registry
+            agent_uri = client.identity.get_token_uri(registration["agentId"])
+            print(f"✅ Retrieved agent URI: {agent_uri}")
+
+            # Fetch and parse the IPFS data
+            print("📥 Fetching agent data from IPFS...")
+            agent_data_from_ipfs = ipfs.fetch_json(agent_uri)
+
+            print("✅ Agent data retrieved and parsed:")
+            print(f"   Name: {agent_data_from_ipfs['name']}")
+            print(f"   Description: {agent_data_from_ipfs['description']}")
+            print(f"   Type: {agent_data_from_ipfs['type']}")
+            print(f"   Endpoints: {len(agent_data_from_ipfs['endpoints'])}")
+            print(f"   Supported Trust: {agent_data_from_ipfs['supportedTrust']}")
+
+            # Validate the structure matches ERC-8004 spec
+            if agent_data_from_ipfs["type"] != "https://eips.ethereum.org/EIPS/eip-8004#registration-v1":
+                print("⚠️  Warning: Agent registration type does not match ERC-8004 spec")
+
+            # Example: Access specific endpoints
+            a2a_endpoint = next(
+                (ep for ep in agent_data_from_ipfs["endpoints"] if ep["name"] == "A2A"),
+                None,
+            )
+            if a2a_endpoint:
+                print(f"   A2A Endpoint: {a2a_endpoint['endpoint']}")
+            print()
+
+            # ============================================
+            # 7. Upload Feedback/Validation Data
+            # ============================================
+
+            feedback_data = {
+                "task": "Data analysis task #123",
+                "performance": {
+                    "accuracy": 0.95,
+                    "latency_ms": 1500,
+                    "completeness": 1.0,
+                },
+                "comments": "Excellent work, met all requirements",
+                "timestamp": "2025-10-15T00:00:00Z",
             }
 
-            result = ipfs.upload_json(agent_data, name="test-agent.json")
-            print("✅ Uploaded to IPFS!")
-            print(f"   CID: {result.cid}")
-            print(f"   URI: {result.uri}")
-            print(f"   URL: {result.url}")
-            if result.size:
-                print(f"   Size: {result.size} bytes\n")
+            print("📤 Uploading feedback data to IPFS...")
+            feedback_result = ipfs.upload_json(feedback_data, name="feedback-123.json")
+            print(f"✅ Feedback uploaded: {feedback_result.uri}")
+            print()
 
-            # Convert CID to bytes32 for on-chain use
-            request_hash = cid_to_bytes32(result.cid)
-            print(f"✅ Request hash for validation: {request_hash}\n")
+            # Now you can use this URI when submitting feedback
+            # feedback_hash = ipfs_uri_to_bytes32(feedback_result.uri)
+            # await client.reputation.give_feedback(
+            #     agent_id=registration["agentId"],
+            #     score=95,
+            #     tag1="excellent",
+            #     tag2="reliable",
+            #     feedback_auth=signed_auth,
+            # )
 
-        except Exception as error:
-            print(f"❌ Error uploading: {error}\n")
+    except Exception as error:
+        print(f"❌ Error: {error}")
 
-    # Test 3: Fetch from IPFS
-    print("📋 Test 3: Fetch content from IPFS")
-    try:
-        # Use a known public CID for testing
-        # This is a test file - replace with your own CID
-        print("   Fetching from public IPFS gateway...")
-        print("   (This may take a moment...)\n")
 
-        # Create a read-only IPFS client (no credentials needed for fetching)
-        config = IPFSClientConfig(provider="ipfs", gateway_url="https://ipfs.io/ipfs/")
-        ipfs = create_ipfs_client(config)
+# ============================================
+# Advanced Examples
+# ============================================
 
-        # Try to fetch a well-known IPFS file (IPFS docs logo)
-        test_cid = "QmPZ9gcCEpqKTo6aq61g2nXGUhM4iCL3ewB6LDXZCtioEB"
+
+def complete_agent_lifecycle():
+    """
+    Example: Complete Agent Lifecycle - Upload, Register, Fetch, Verify
+    This shows the full cycle of agent registration and data retrieval
+    """
+    print("\n🔄 Complete Agent Lifecycle Example\n")
+
+    # 1. Create IPFS client
+    ipfs = create_ipfs_client(
+        IPFSClientConfig(
+            provider="pinata",
+            api_key=os.getenv("PINATA_API_KEY", ""),
+            api_secret=os.getenv("PINATA_API_SECRET", ""),
+        )
+    )
+
+    # 2. Prepare agent metadata
+    agent_metadata = {
+        "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+        "name": "Advanced Analytics Agent",
+        "description": "Specialized in data analysis and insights",
+        "image": "https://example.com/analytics-agent.png",
+        "endpoints": [
+            {
+                "name": "A2A",
+                "endpoint": "https://analytics.example.com/.well-known/agent-card.json",
+                "version": "0.3.0",
+            }
+        ],
+        "registrations": [],
+        "supportedTrust": ["reputation", "validation"],
+    }
+
+    # 3. Upload to IPFS
+    print("📤 Step 1: Uploading agent metadata to IPFS...")
+    upload_result = ipfs.upload_json(agent_metadata, name="analytics-agent.json")
+    print(f"   ✅ Uploaded with CID: {upload_result.cid}")
+
+    # 4. Register on blockchain
+    print("📝 Step 2: Registering agent on blockchain...")
+    sepolia_rpc = os.getenv("SEPOLIA_RPC_URL", "")
+    private_key = os.getenv("SEPOLIA_TESTNET_PRIVATE_KEY_1", "")
+
+    if not sepolia_rpc or not private_key:
+        print("   ⚠️  Skipping blockchain steps (credentials not found)")
+        return
+
+    w3 = Web3(Web3.HTTPProvider(sepolia_rpc))
+    adapter = Web3Adapter(w3, private_key=private_key)
+    client = ERC8004Client(
+        adapter=adapter,
+        addresses={
+            "identityRegistry": IDENTITY_REGISTRY,
+            "reputationRegistry": REPUTATION_REGISTRY,
+            "validationRegistry": VALIDATION_REGISTRY,
+            "chainId": 11155111,
+        },
+    )
+
+    registration = client.identity.register_with_uri(upload_result.uri)
+    print(f"   ✅ Registered as Agent ID: {registration['agentId']}")
+
+    # 5. Fetch from registry (simulating another user discovering the agent)
+    print("🔍 Step 3: Fetching agent data from registry...")
+    registered_uri = client.identity.get_token_uri(registration["agentId"])
+    print(f"   ✅ Retrieved URI: {registered_uri}")
+
+    # 6. Fetch and parse IPFS data
+    print("📥 Step 4: Fetching agent metadata from IPFS...")
+    retrieved_metadata = ipfs.fetch_json(registered_uri)
+    print(f"   ✅ Retrieved agent: {retrieved_metadata['name']}")
+
+    # 7. Verify integrity
+    print("🔐 Step 5: Verifying data integrity...")
+    original_json = json.dumps(agent_metadata, sort_keys=True)
+    retrieved_json = json.dumps(retrieved_metadata, sort_keys=True)
+    integrity_match = original_json == retrieved_json
+    print(f"   {'✅' if integrity_match else '❌'} Data integrity: {'VERIFIED' if integrity_match else 'FAILED'}")
+
+    # 8. Parse and use agent data
+    print("📊 Step 6: Using agent data...")
+    print(f"   Agent supports: {', '.join(retrieved_metadata['supportedTrust'])}")
+    print(f"   Endpoints available: {len(retrieved_metadata['endpoints'])}")
+
+    return {
+        "agent_id": registration["agentId"],
+        "cid": upload_result.cid,
+        "metadata": retrieved_metadata,
+    }
+
+
+def discover_agent(agent_id: int):
+    """
+    Example: Discover and interact with an existing agent
+    """
+    print(f"\n🔎 Discovering Agent ID: {agent_id}\n")
+
+    # Setup clients
+    ipfs = create_ipfs_client(
+        IPFSClientConfig(
+            provider="pinata",
+            api_key=os.getenv("PINATA_API_KEY", ""),
+            api_secret=os.getenv("PINATA_API_SECRET", ""),
+        )
+    )
+
+    sepolia_rpc = os.getenv("SEPOLIA_RPC_URL", "")
+    private_key = os.getenv("SEPOLIA_TESTNET_PRIVATE_KEY_1", "")
+
+    if not sepolia_rpc or not private_key:
+        print("❌ Blockchain credentials not found")
+        return
+
+    w3 = Web3(Web3.HTTPProvider(sepolia_rpc))
+    adapter = Web3Adapter(w3, private_key=private_key)
+    client = ERC8004Client(
+        adapter=adapter,
+        addresses={
+            "identityRegistry": IDENTITY_REGISTRY,
+            "reputationRegistry": REPUTATION_REGISTRY,
+            "validationRegistry": VALIDATION_REGISTRY,
+            "chainId": 11155111,
+        },
+    )
+
+    # 1. Fetch agent URI from registry
+    print("📖 Fetching agent from registry...")
+    uri = client.identity.get_token_uri(agent_id)
+    print(f"   Token URI: {uri}")
+
+    # 2. Fetch agent data from IPFS
+    print("📥 Fetching agent data from IPFS...")
+    agent_data = ipfs.fetch_json(uri)
+
+    # 3. Display agent information
+    print("\n📋 Agent Information:")
+    print(f"   Name: {agent_data['name']}")
+    print(f"   Description: {agent_data['description']}")
+    print(f"   Type: {agent_data['type']}")
+
+    # 4. Check trust models
+    print("\n🔒 Trust Models:")
+    if agent_data.get("supportedTrust") and len(agent_data["supportedTrust"]) > 0:
+        for trust in agent_data["supportedTrust"]:
+            print(f"   ✓ {trust}")
+    else:
+        print("   ⚠️  No trust models specified")
+
+    # 5. List endpoints
+    print("\n🔌 Endpoints:")
+    if agent_data.get("endpoints") and len(agent_data["endpoints"]) > 0:
+        for endpoint in agent_data["endpoints"]:
+            print(f"   • {endpoint['name']}: {endpoint['endpoint']}")
+            if endpoint.get("version"):
+                print(f"     Version: {endpoint['version']}")
+    else:
+        print("   ⚠️  No endpoints defined")
+
+    # 6. Check registrations
+    print("\n📝 Registrations:")
+    if agent_data.get("registrations") and len(agent_data["registrations"]) > 0:
+        for reg in agent_data["registrations"]:
+            print(f"   • Agent ID: {reg['agentId']} on {reg['agentRegistry']}")
+    else:
+        print("   No cross-chain registrations")
+
+    return agent_data
+
+
+def upload_file_buffer():
+    """
+    Example: Upload a file buffer
+    """
+    ipfs = create_ipfs_client(
+        IPFSClientConfig(
+            provider="pinata",
+            api_key=os.getenv("PINATA_API_KEY", ""),
+            api_secret=os.getenv("PINATA_API_SECRET", ""),
+        )
+    )
+
+    # Upload binary data
+    buffer = b"Hello, IPFS!"
+    result = ipfs.upload(buffer, name="message.txt")
+
+    print(f"Uploaded buffer: {result.uri}")
+    return result
+
+
+def upload_with_manifest():
+    """
+    Example: Upload multiple files and create a manifest
+    """
+    ipfs = create_ipfs_client(
+        IPFSClientConfig(
+            provider="nftstorage",
+            api_key=os.getenv("NFT_STORAGE_KEY", ""),
+        )
+    )
+
+    # Upload individual files
+    file1 = ipfs.upload_json({"data": "File 1"})
+    file2 = ipfs.upload_json({"data": "File 2"})
+
+    # Create manifest
+    manifest = {
+        "files": [
+            {"name": "file1.json", "uri": file1.uri},
+            {"name": "file2.json", "uri": file2.uri},
+        ]
+    }
+
+    manifest_result = ipfs.upload_json(manifest, name="manifest.json")
+
+    print(f"Manifest CID: {manifest_result.cid}")
+    return manifest_result
+
+
+def bulk_upload(data_array: list):
+    """
+    Example: Bulk upload with error handling
+    """
+    ipfs = create_ipfs_client(
+        IPFSClientConfig(
+            provider="web3storage",
+            api_key=os.getenv("WEB3_STORAGE_KEY", ""),
+        )
+    )
+
+    results = []
+
+    for index, data in enumerate(data_array):
         try:
-            print(f"   Attempting to fetch CID: {test_cid}")
-            # Note: This is a text file, so it should work
-            # For binary files, you'd need to handle the response differently
-            content = ipfs.fetch(test_cid)
-            print(f"✅ Fetched content ({len(content)} bytes)")
-            print(f"   Preview: {content[:100]}...\n")
-        except Exception as fetch_error:
-            print(f"⚠️  Fetch failed (gateway may be slow): {fetch_error}")
-            print("   This is normal - public IPFS gateways can be unreliable\n")
+            result = ipfs.upload_json(data, name=f"data-{index}.json")
+            results.append({"success": True, "result": result})
+            print(f"✅ Uploaded {index + 1}/{len(data_array)}")
+        except Exception as error:
+            results.append({"success": False, "error": str(error)})
+            print(f"❌ Failed {index + 1}/{len(data_array)}")
 
-    except Exception as error:
-        print(f"❌ Error: {error}\n")
-
-    # Test 4: Get gateway URL
-    print("📋 Test 4: Gateway URL generation")
-    try:
-        config = IPFSClientConfig(provider="ipfs")
-        ipfs = create_ipfs_client(config)
-
-        test_cid = "QmExample123"
-        gateway_url = ipfs.get_gateway_url(test_cid)
-        print(f"✅ Gateway URL: {gateway_url}\n")
-    except Exception as error:
-        print(f"❌ Error: {error}\n")
-
-    print("✨ All IPFS tests completed!")
-    print("\n💡 Tips:")
-    print("   - Set up Pinata, NFT.Storage, or Web3.Storage for reliable uploads")
-    print("   - Use IPFS URIs in agent registration for decentralized storage")
-    print("   - Convert CIDs to bytes32 for validation request hashes")
+    return results
 
 
 if __name__ == "__main__":
