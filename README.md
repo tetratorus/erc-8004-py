@@ -150,31 +150,34 @@ Main client with three sub-clients:
 ### IdentityClient
 
 - `register()` - Register agent without URI
-- `register_with_uri(uri)` - Register with token URI
-- `register_with_metadata(uri, metadata)` - Register with URI and metadata
+- `register_with_uri(token_uri)` - Register with token URI
+- `register_with_metadata(token_uri, metadata=None)` - Register with URI and optional metadata
 - `get_token_uri(agent_id)` - Get token URI
+- `set_agent_uri(agent_id, new_uri)` - Set token URI
 - `get_owner(agent_id)` - Get agent owner
 - `get_metadata(agent_id, key)` - Get on-chain metadata
 - `set_metadata(agent_id, key, value)` - Set on-chain metadata
+- `get_registration_file(agent_id)` - Fetch and parse agent registration file
 
 ### ReputationClient
 
-- `give_feedback(agent_id, score, tag1, tag2, ...)` - Submit feedback (no auth needed!)
-- `revoke_feedback(agent_id, index)` - Revoke your own feedback
-- `get_summary(agent_id, client_addresses, tag1, tag2)` - Get reputation summary with optional filters
-- `read_feedback(agent_id, client, index)` - Read specific feedback (indices start at 1)
-- `read_all_feedback(agent_id, ...)` - Read all feedback with optional filters
+- `give_feedback(agent_id, score, tag1=None, tag2=None, feedback_uri=None, feedback_hash=None)` - Submit feedback (no auth needed!)
+- `revoke_feedback(agent_id, feedback_index)` - Revoke your own feedback
+- `append_response(agent_id, client_address, feedback_index, response_uri, response_hash=None)` - Agent can append response to feedback
+- `get_summary(agent_id, client_addresses=None, tag1=None, tag2=None)` - Get reputation summary with optional filters
+- `read_feedback(agent_id, client_address, index)` - Read specific feedback (indices start at 1)
+- `read_all_feedback(agent_id, client_addresses=None, tag1=None, tag2=None, include_revoked=False)` - Read all feedback with optional filters
 - `get_clients(agent_id)` - Get all clients who gave feedback
-- `get_last_index(agent_id, client)` - Get last feedback index for a client
-- `append_response(...)` - Agent can append response to feedback
+- `get_last_index(agent_id, client_address)` - Get last feedback index for a client
 
 ### ValidationClient
 
-- `validation_request(...)` - Request validation
-- `validation_response(...)` - Provide validation response
+- `validation_request(validator_address, agent_id, request_uri, request_hash)` - Request validation
+- `validation_response(request_hash, response, response_uri=None, response_hash=None, tag=None)` - Provide validation response
 - `get_validation_status(request_hash)` - Get validation status
-- `get_summary(agent_id, ...)` - Get validation summary
+- `get_summary(agent_id, validator_addresses=None, tag=None)` - Get validation summary with optional filters
 - `get_agent_validations(agent_id)` - Get all validations for agent
+- `get_validator_requests(validator_address)` - Get all requests for a validator
 
 ### IPFSClient
 

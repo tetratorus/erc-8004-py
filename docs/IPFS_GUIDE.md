@@ -521,4 +521,4 @@ See `examples/test_ipfs.py` for complete working examples.
 - [Pinata Documentation](https://docs.pinata.cloud/)
 - [NFT.Storage Documentation](https://nft.storage/docs/)
 - [Web3.Storage Documentation](https://web3.storage/docs/)
-- [ERC-8004 Specification](../SPEC.md)
+- [ERC-8004 Specification](https://eips.ethereum.org/EIPS/eip-8004)
