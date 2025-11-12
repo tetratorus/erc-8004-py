@@ -75,7 +75,7 @@ class ValidationClient:
     ) -> Dict[str, str]:
         """
         Provide a validation response
-        Spec: function validationResponse(bytes32 requestHash, uint8 response, string responseUri, bytes32 responseHash, bytes32 tag)
+        Spec: function validationResponse(bytes32 requestHash, uint8 response, string responseUri, bytes32 responseHash, string tag)
         Note: MUST be called by the validatorAddress specified in the original request
         Note: Can be called multiple times for the same requestHash
 
@@ -84,7 +84,7 @@ class ValidationClient:
             response: Response value 0-100 (MANDATORY)
             response_uri: URI to response content (OPTIONAL)
             response_hash: Hash of response content (OPTIONAL, bytes32)
-            tag: Tag for categorization (OPTIONAL, bytes32)
+            tag: Tag for categorization (OPTIONAL, now a string not bytes32)
 
         Returns:
             Dictionary with txHash
@@ -98,13 +98,14 @@ class ValidationClient:
         response_hash_bytes = (
             bytes.fromhex(response_hash[2:]) if response_hash else bytes(32)
         )
-        tag_bytes = Web3.keccak(text=tag) if tag else bytes(32)
+        # NEW: Tag is now a string, pass it directly
+        tag_str = tag or ""
 
         result = self.adapter.send(
             self.contract_address,
             self.abi,
             "validationResponse",
-            [request_hash, response, response_uri_str, response_hash_bytes, tag_bytes],
+            [request_hash, response, response_uri_str, response_hash_bytes, tag_str],
         )
 
         return {"txHash": result["txHash"]}
@@ -124,13 +125,13 @@ class ValidationClient:
     def get_validation_status(self, request_hash: str) -> ValidationStatus:
         """
         Get validation status for a request
-        Spec: function getValidationStatus(bytes32 requestHash) returns (address validatorAddress, uint256 agentId, uint8 response, bytes32 responseHash, bytes32 tag, uint256 lastUpdate)
+        Spec: function getValidationStatus(bytes32 requestHash) returns (address validatorAddress, uint256 agentId, uint8 response, bytes32 responseHash, string tag, uint256 lastUpdate)
 
         Args:
             request_hash: The request hash (bytes32)
 
         Returns:
-            ValidationStatus dictionary
+            ValidationStatus dictionary (tag is now a string)
         """
         result = self.adapter.call(
             self.contract_address, self.abi, "getValidationStatus", [request_hash]
@@ -146,7 +147,7 @@ class ValidationClient:
                 "agentId": int(result[1]),
                 "response": int(result[2]),
                 "responseHash": "0x" + "00" * 32,  # Empty bytes32
-                "tag": result[3].hex() if isinstance(result[3], bytes) else result[3],
+                "tag": result[3],  # NEW: Now a string, no hex conversion needed
                 "lastUpdate": int(result[4]),
             }
         else:
@@ -156,7 +157,7 @@ class ValidationClient:
                 "agentId": int(result[1]),
                 "response": int(result[2]),
                 "responseHash": result[3].hex() if isinstance(result[3], bytes) else result[3],
-                "tag": result[4].hex() if isinstance(result[4], bytes) else result[4],
+                "tag": result[4],  # NEW: Now a string, no hex conversion needed
                 "lastUpdate": int(result[5]),
             }
 
@@ -168,25 +169,26 @@ class ValidationClient:
     ) -> Dict[str, any]:
         """
         Get validation summary for an agent
-        Spec: function getSummary(uint256 agentId, address[] validatorAddresses, bytes32 tag) returns (uint64 count, uint8 avgResponse)
+        Spec: function getSummary(uint256 agentId, address[] validatorAddresses, string tag) returns (uint64 count, uint8 avgResponse)
         Note: agentId is ONLY mandatory parameter, validatorAddresses and tag are OPTIONAL filters
 
         Args:
             agent_id: The agent ID (MANDATORY)
             validator_addresses: OPTIONAL filter by specific validators
-            tag: OPTIONAL filter by tag
+            tag: OPTIONAL filter by tag (now a string, not bytes32)
 
         Returns:
             Dictionary with count and avgResponse
         """
         validators = validator_addresses or []
-        tag_bytes = Web3.keccak(text=tag) if tag else bytes(32)
+        # NEW: Tag is now a string, pass it directly
+        tag_str = tag or ""
 
         result = self.adapter.call(
             self.contract_address,
             self.abi,
             "getSummary",
-            [agent_id, validators, tag_bytes],
+            [agent_id, validators, tag_str],
         )
 
         return {"count": int(result[0]), "avgResponse": int(result[1])}

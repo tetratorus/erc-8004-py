@@ -7,11 +7,8 @@ import json
 import os
 from typing import Dict, List, Optional
 
-from eth_abi import encode
-from web3 import Web3
-
 from .adapters.base import BlockchainAdapter
-from .types import FeedbackAuth, Summary
+from .types import Summary
 
 
 class ReputationClient:
@@ -42,83 +39,11 @@ class ReputationClient:
         with open(abi_path, "r") as f:
             self.abi = json.load(f)
 
-    def create_feedback_auth(
-        self,
-        agent_id: int,
-        client_address: str,
-        index_limit: int,
-        expiry: int,
-        chain_id: int,
-        signer_address: str,
-    ) -> FeedbackAuth:
-        """
-        Create a feedbackAuth structure to be signed
-        Spec: tuple (agentId, clientAddress, indexLimit, expiry, chainId, identityRegistry, signerAddress)
-
-        Args:
-            agent_id: The agent ID
-            client_address: Address authorized to give feedback
-            index_limit: Must be > last feedback index from this client (typically lastIndex + 1)
-            expiry: Unix timestamp when authorization expires
-            chain_id: Chain ID where feedback will be submitted
-            signer_address: Address of the signer (agent owner/operator)
-
-        Returns:
-            FeedbackAuth dictionary
-        """
-        return {
-            "agentId": agent_id,
-            "clientAddress": client_address,
-            "indexLimit": index_limit,
-            "expiry": expiry,
-            "chainId": chain_id,
-            "identityRegistry": self.identity_registry_address,
-            "signerAddress": signer_address,
-        }
-
-    def sign_feedback_auth(self, auth: FeedbackAuth) -> str:
-        """
-        Sign a feedbackAuth using EIP-191
-        The agent owner/operator signs to authorize a client to give feedback
-
-        Args:
-            auth: The feedbackAuth structure
-
-        Returns:
-            Signed authorization as bytes (encoded tuple + signature concatenated)
-        """
-        # Encode the feedbackAuth tuple
-        # Spec: (agentId, clientAddress, indexLimit, expiry, chainId, identityRegistry, signerAddress)
-        encoded = encode(
-            ["uint256", "address", "uint256", "uint256", "uint256", "address", "address"],
-            [
-                auth["agentId"],
-                Web3.to_checksum_address(auth["clientAddress"]),
-                auth["indexLimit"],
-                auth["expiry"],
-                auth["chainId"],
-                Web3.to_checksum_address(auth["identityRegistry"]),
-                Web3.to_checksum_address(auth["signerAddress"]),
-            ],
-        )
-
-        # Hash the encoded data
-        message_hash = Web3.keccak(encoded)
-
-        # Sign using EIP-191 (personal_sign)
-        # This prefixes the message with "\x19Ethereum Signed Message:\n32"
-        signature = self.adapter.sign_message(message_hash)
-
-        # Return encoded tuple + signature concatenated
-        # Remove '0x' prefix from signature if present
-        sig_hex = signature[2:] if signature.startswith('0x') else signature
-        return "0x" + encoded.hex() + sig_hex
 
     def give_feedback(
         self,
         agent_id: int,
         score: int,
-        feedback_auth: str,
         tag1: Optional[str] = None,
         tag2: Optional[str] = None,
         feedback_uri: Optional[str] = None,
@@ -126,14 +51,14 @@ class ReputationClient:
     ) -> Dict[str, str]:
         """
         Submit feedback for an agent
-        Spec: function giveFeedback(uint256 agentId, uint8 score, bytes32 tag1, bytes32 tag2, string calldata feedbackUri, bytes32 calldata feedbackHash, bytes memory feedbackAuth)
+        Spec: function giveFeedback(uint256 agentId, uint8 score, string tag1, string tag2, string calldata feedbackUri, bytes32 calldata feedbackHash)
+        NOTE: feedbackAuth has been REMOVED in the new contract
 
         Args:
             agent_id: The agent ID
             score: Score 0-100 (MUST)
-            feedback_auth: Signed feedbackAuth
-            tag1: OPTIONAL tag (will be hashed to bytes32)
-            tag2: OPTIONAL tag (will be hashed to bytes32)
+            tag1: OPTIONAL tag (now a string, not bytes32)
+            tag2: OPTIONAL tag (now a string, not bytes32)
             feedback_uri: OPTIONAL feedback URI
             feedback_hash: OPTIONAL feedback hash (bytes32)
 
@@ -144,9 +69,9 @@ class ReputationClient:
         if score < 0 or score > 100:
             raise ValueError("Score MUST be between 0 and 100")
 
-        # Convert optional string parameters to bytes32 (or empty bytes32 if not provided)
-        tag1_bytes = Web3.keccak(text=tag1) if tag1 else bytes(32)
-        tag2_bytes = Web3.keccak(text=tag2) if tag2 else bytes(32)
+        # NEW: Tags are now strings, pass them directly
+        tag1_str = tag1 or ""
+        tag2_str = tag2 or ""
         feedback_hash_bytes = bytes.fromhex(feedback_hash[2:]) if feedback_hash else bytes(32)
         feedback_uri_str = feedback_uri or ""
 
@@ -157,11 +82,10 @@ class ReputationClient:
             [
                 agent_id,
                 score,
-                tag1_bytes,
-                tag2_bytes,
+                tag1_str,
+                tag2_str,
                 feedback_uri_str,
                 feedback_hash_bytes,
-                bytes.fromhex(feedback_auth[2:]),
             ],
         )
 
@@ -239,21 +163,22 @@ class ReputationClient:
     ) -> Summary:
         """
         Get reputation summary for an agent
-        Spec: function getSummary(uint256 agentId, address[] calldata clientAddresses, bytes32 tag1, bytes32 tag2) returns (uint64 count, uint8 averageScore)
+        Spec: function getSummary(uint256 agentId, address[] calldata clientAddresses, string tag1, string tag2) returns (uint64 count, uint8 averageScore)
         Note: agentId is ONLY mandatory parameter, others are OPTIONAL filters
 
         Args:
             agent_id: The agent ID (MANDATORY)
             client_addresses: OPTIONAL filter by specific clients
-            tag1: OPTIONAL filter by tag1
-            tag2: OPTIONAL filter by tag2
+            tag1: OPTIONAL filter by tag1 (now a string, not bytes32)
+            tag2: OPTIONAL filter by tag2 (now a string, not bytes32)
 
         Returns:
             Summary dictionary with count and averageScore
         """
         clients = client_addresses or []
-        t1 = Web3.keccak(text=tag1) if tag1 else bytes(32)
-        t2 = Web3.keccak(text=tag2) if tag2 else bytes(32)
+        # NEW: Tags are now strings, pass them directly
+        t1 = tag1 or ""
+        t2 = tag2 or ""
 
         result = self.adapter.call(
             self.contract_address, self.abi, "getSummary", [agent_id, clients, t1, t2]
@@ -266,7 +191,7 @@ class ReputationClient:
     ) -> Dict[str, any]:
         """
         Read a specific feedback entry
-        Spec: function readFeedback(uint256 agentId, address clientAddress, uint64 index) returns (uint8 score, bytes32 tag1, bytes32 tag2, bool isRevoked)
+        Spec: function readFeedback(uint256 agentId, address clientAddress, uint64 index) returns (uint8 score, string tag1, string tag2, bool isRevoked)
 
         Args:
             agent_id: The agent ID
@@ -274,7 +199,7 @@ class ReputationClient:
             index: Feedback index
 
         Returns:
-            Dictionary with score, tag1, tag2, isRevoked
+            Dictionary with score, tag1, tag2, isRevoked (tags are now strings)
         """
         result = self.adapter.call(
             self.contract_address,
@@ -283,10 +208,11 @@ class ReputationClient:
             [agent_id, client_address, index],
         )
 
+        # NEW: Tags are now strings, no hex conversion needed
         return {
             "score": int(result[0]),
-            "tag1": result[1].hex() if isinstance(result[1], bytes) else result[1],
-            "tag2": result[2].hex() if isinstance(result[2], bytes) else result[2],
+            "tag1": result[1],
+            "tag2": result[2],
             "isRevoked": bool(result[3]),
         }
 
@@ -300,22 +226,23 @@ class ReputationClient:
     ) -> Dict[str, List]:
         """
         Read all feedback for an agent with optional filters
-        Spec: function readAllFeedback(uint256 agentId, address[] calldata clientAddresses, bytes32 tag1, bytes32 tag2, bool includeRevoked) returns arrays
+        Spec: function readAllFeedback(uint256 agentId, address[] calldata clientAddresses, string tag1, string tag2, bool includeRevoked) returns arrays
         Note: agentId is ONLY mandatory parameter
 
         Args:
             agent_id: The agent ID (MANDATORY)
             client_addresses: OPTIONAL filter by clients
-            tag1: OPTIONAL filter by tag1
-            tag2: OPTIONAL filter by tag2
+            tag1: OPTIONAL filter by tag1 (now a string, not bytes32)
+            tag2: OPTIONAL filter by tag2 (now a string, not bytes32)
             include_revoked: OPTIONAL include revoked feedback
 
         Returns:
-            Dictionary with arrays of clientAddresses, scores, tag1s, tag2s, revokedStatuses
+            Dictionary with arrays of clientAddresses, scores, tag1s, tag2s, revokedStatuses (tags are now strings)
         """
         clients = client_addresses or []
-        t1 = Web3.keccak(text=tag1) if tag1 else bytes(32)
-        t2 = Web3.keccak(text=tag2) if tag2 else bytes(32)
+        # NEW: Tags are now strings, pass them directly
+        t1 = tag1 or ""
+        t2 = tag2 or ""
 
         result = self.adapter.call(
             self.contract_address,
@@ -324,11 +251,12 @@ class ReputationClient:
             [agent_id, clients, t1, t2, include_revoked],
         )
 
+        # NEW: Tags are now strings, no hex conversion needed
         return {
             "clientAddresses": list(result[0]),
             "scores": [int(s) for s in result[1]],
-            "tag1s": [t.hex() if isinstance(t, bytes) else t for t in result[2]],
-            "tag2s": [t.hex() if isinstance(t, bytes) else t for t in result[3]],
+            "tag1s": list(result[2]),
+            "tag2s": list(result[3]),
             "revokedStatuses": [bool(r) for r in result[4]],
         }
 

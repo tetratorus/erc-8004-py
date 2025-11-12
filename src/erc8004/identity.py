@@ -87,9 +87,10 @@ class IdentityClient:
         if metadata is None:
             metadata = []
 
-        # Convert metadata to contract format
+        # Convert metadata to contract format - NEW: strings instead of bytes
+        # Field names: metadataKey and metadataValue (not key/value)
         metadata_formatted = [
-            {"key": m["key"], "value": m["value"].encode("utf-8")} for m in metadata
+            {"metadataKey": m["key"], "metadataValue": m["value"]} for m in metadata
         ]
 
         result = self.adapter.send(
@@ -148,7 +149,7 @@ class IdentityClient:
     def get_metadata(self, agent_id: int, key: str) -> str:
         """
         Get on-chain metadata for an agent
-        Spec: function getMetadata(uint256 agentId, string key) returns (bytes)
+        Spec: function getMetadata(uint256 agentId, string key) returns (string)
 
         Args:
             agent_id: The agent's ID
@@ -157,15 +158,15 @@ class IdentityClient:
         Returns:
             Metadata value as string
         """
-        bytes_value = self.adapter.call(
+        # NEW: Returns string directly, no bytes conversion needed
+        return self.adapter.call(
             self.contract_address, self.abi, "getMetadata", [agent_id, key]
         )
-        return self._bytes_to_string(bytes_value)
 
     def set_metadata(self, agent_id: int, key: str, value: str) -> Dict[str, str]:
         """
         Set on-chain metadata for an agent
-        Spec: function setMetadata(uint256 agentId, string key, bytes value)
+        Spec: function setMetadata(uint256 agentId, string key, string value)
 
         Args:
             agent_id: The agent's ID
@@ -175,11 +176,12 @@ class IdentityClient:
         Returns:
             Dictionary with txHash
         """
+        # NEW: Pass string directly, no bytes conversion needed
         result = self.adapter.send(
             self.contract_address,
             self.abi,
             "setMetadata",
-            [agent_id, key, value.encode("utf-8")],
+            [agent_id, key, value],
         )
 
         return {"txHash": result["txHash"]}
@@ -229,13 +231,3 @@ class IdentityClient:
             "Could not extract agentId from transaction receipt - Registered event not found"
         )
 
-    def _bytes_to_string(self, bytes_value: any) -> str:
-        """Helper: Convert bytes to string (adapter-agnostic)"""
-        if isinstance(bytes_value, bytes):
-            return bytes_value.decode("utf-8")
-        elif isinstance(bytes_value, str) and bytes_value.startswith("0x"):
-            # Hex string format
-            hex_str = bytes_value[2:]
-            byte_array = bytes.fromhex(hex_str)
-            return byte_array.decode("utf-8")
-        return str(bytes_value)

@@ -17,10 +17,10 @@ import time
 from erc8004 import ERC8004Client, Web3Adapter
 from web3 import Web3
 
-# Contract addresses from your deployment
-IDENTITY_REGISTRY = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-REPUTATION_REGISTRY = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-VALIDATION_REGISTRY = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+# Contract addresses - CREATE2 vanity addresses (same on all networks)
+IDENTITY_REGISTRY = "0x8004AbdDA9b877187bF865eD1d8B5A41Da3c4997"
+REPUTATION_REGISTRY = "0x8004B312333aCb5764597c2BeEe256596B5C6876"
+VALIDATION_REGISTRY = "0x8004C8AEF64521bC97AB50799d394CDb785885E3"
 
 
 def main():
@@ -73,40 +73,11 @@ def main():
     print(f"✅ Agent registered with ID: {agent_id}")
     print(f"   TX Hash: {register_result['txHash']}\n")
 
-    # Step 2: Get chain ID and create feedbackAuth
-    print("📋 Step 2: Creating feedbackAuth...")
-    chain_id = agent_sdk.get_chain_id()
-
-    # Get the last feedback index for this client
-    last_index = agent_sdk.reputation.get_last_index(agent_id, client_address)
-    print(f"   Last feedback index: {last_index}")
-
-    # Create feedbackAuth
-    feedback_auth = agent_sdk.reputation.create_feedback_auth(
-        agent_id,
-        client_address,
-        last_index + 1,  # Allow next feedback
-        int(time.time()) + 3600,  # Valid for 1 hour
-        chain_id,
-        agent_owner_address,
-    )
-    print("✅ FeedbackAuth created")
-    print(f"   indexLimit: {feedback_auth['indexLimit']}")
-    print(f"   expiry: {feedback_auth['expiry']}\n")
-
-    # Step 3: Agent owner signs the feedbackAuth
-    print("📋 Step 3: Signing feedbackAuth...")
-    signed_auth = agent_sdk.reputation.sign_feedback_auth(feedback_auth)
-    print("✅ FeedbackAuth signed")
-    print(f"   Signature length: {len(signed_auth)}")
-    print(f"   Signature: {signed_auth[:20]}...\n")
-
-    # Step 4: Client submits feedback
-    print("📋 Step 4: Client submitting feedback...")
+    # Step 2: Client submits feedback (NO feedbackAuth needed in new contract!)
+    print("📋 Step 2: Client submitting feedback...")
     feedback_result = client_sdk.reputation.give_feedback(
         agent_id=agent_id,
         score=95,
-        feedback_auth=signed_auth,
         tag1="excellent",
         tag2="fast",
     )
@@ -115,8 +86,8 @@ def main():
     print("   Tags: excellent, fast")
     print(f"   TX Hash: {feedback_result['txHash']}\n")
 
-    # Step 5: Read the feedback back
-    print("📋 Step 5: Reading feedback...")
+    # Step 3: Read the feedback back
+    print("\n📋 Step 3: Reading feedback...")
     feedback = client_sdk.reputation.read_feedback(agent_id, client_address, 1)
     print("✅ Feedback retrieved:")
     print(f"   Score: {feedback['score']} / 100")
@@ -124,67 +95,56 @@ def main():
     print(f"   Tag2: {feedback['tag2']}")
     print(f"   Revoked: {feedback['isRevoked']}\n")
 
-    # Step 6: Get reputation summary
-    print("📋 Step 6: Getting reputation summary...")
+    # Step 4: Get reputation summary
+    print("📋 Step 4: Getting reputation summary...")
     summary = client_sdk.reputation.get_summary(agent_id, [client_address])
     print("✅ Reputation summary:")
     print(f"   Feedback Count: {summary['count']}")
     print(f"   Average Score: {summary['averageScore']} / 100\n")
 
-    # Step 7: Get all clients who gave feedback
-    print("📋 Step 7: Getting all clients...")
+    # Step 5: Get all clients who gave feedback
+    print("📋 Step 5: Getting all clients...")
     clients = client_sdk.reputation.get_clients(agent_id)
     print(f"✅ Clients who gave feedback: {len(clients)}")
     print(f"   {', '.join(clients)}\n")
 
-    # Step 8: Submit another feedback with higher score
-    print("📋 Step 8: Submitting second feedback...")
-    new_last_index = agent_sdk.reputation.get_last_index(agent_id, client_address)
-    feedback_auth2 = agent_sdk.reputation.create_feedback_auth(
-        agent_id,
-        client_address,
-        new_last_index + 1,
-        int(time.time()) + 3600,
-        chain_id,
-        agent_owner_address,
-    )
-    signed_auth2 = agent_sdk.reputation.sign_feedback_auth(feedback_auth2)
-
+    # Step 6: Submit another feedback with higher score
+    print("📋 Step 6: Submitting second feedback...")
     client_sdk.reputation.give_feedback(
-        agent_id=agent_id, score=98, feedback_auth=signed_auth2
+        agent_id=agent_id, score=98
     )
     print("✅ Second feedback submitted (score: 98)\n")
 
-    # Step 9: Get updated summary
-    print("📋 Step 9: Getting updated reputation summary...")
+    # Step 7: Get updated summary
+    print("📋 Step 7: Getting updated reputation summary...")
     updated_summary = client_sdk.reputation.get_summary(agent_id)
     print("✅ Updated reputation summary:")
     print(f"   Feedback Count: {updated_summary['count']}")
     print(f"   Average Score: {updated_summary['averageScore']} / 100\n")
 
-    # Step 10: Read all feedback
-    print("📋 Step 10: Reading all feedback...")
+    # Step 8: Read all feedback
+    print("\n📋 Step 8: Reading all feedback...")
     all_feedback = client_sdk.reputation.read_all_feedback(agent_id)
     print("✅ All feedback retrieved:")
     print(f"   Total: {len(all_feedback['scores'])} feedback entries")
     for i, score in enumerate(all_feedback["scores"]):
         print(f"   [{i}] Client: {all_feedback['clientAddresses'][i][:10]}... Score: {score}")
 
-    # Step 11: Revoke the first feedback
-    print("\n📋 Step 11: Revoking first feedback...")
+    # Step 9: Revoke the first feedback
+    print("\n📋 Step 9: Revoking first feedback...")
     revoke_result = client_sdk.reputation.revoke_feedback(agent_id, 1)
     print("✅ Feedback revoked!")
     print(f"   TX Hash: {revoke_result['txHash']}\n")
 
-    # Step 12: Verify feedback is revoked
-    print("📋 Step 12: Verifying revoked feedback...")
+    # Step 10: Verify feedback is revoked
+    print("📋 Step 10: Verifying revoked feedback...")
     revoked_feedback = client_sdk.reputation.read_feedback(agent_id, client_address, 1)
     print("✅ Revoked feedback status:")
     print(f"   Score: {revoked_feedback['score']} / 100")
     print(f"   Revoked: {revoked_feedback['isRevoked']}\n")
 
-    # Step 13: Get summary after revoke (should exclude revoked feedback)
-    print("📋 Step 13: Getting summary after revoke...")
+    # Step 11: Get summary after revoke (should exclude revoked feedback)
+    print("📋 Step 11: Getting summary after revoke...")
     final_summary = client_sdk.reputation.get_summary(agent_id)
     print("✅ Final reputation summary (excluding revoked):")
     print(f"   Feedback Count: {final_summary['count']}")

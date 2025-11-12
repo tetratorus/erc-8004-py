@@ -50,21 +50,6 @@ class AgentRegistrationFile(TypedDict):
     ]  # OPTIONAL: 'reputation' | 'crypto-economic' | 'tee-attestation'
 
 
-class FeedbackAuth(TypedDict):
-    """
-    Feedback authorization structure
-    Tuple: (agentId, clientAddress, indexLimit, expiry, chainId, identityRegistry, signerAddress)
-    """
-
-    agentId: int
-    clientAddress: str
-    indexLimit: int
-    expiry: int
-    chainId: int
-    identityRegistry: str
-    signerAddress: str
-
-
 class Feedback(TypedDict):
     """Feedback structure as stored on-chain"""
 
@@ -87,6 +72,7 @@ class FeedbackFile(TypedDict):
     """
     Off-chain feedback file structure
     Fields beyond the MUST fields are all OPTIONAL per spec
+    NOTE: feedbackAuth has been REMOVED in the new contract version
     """
 
     # MUST fields
@@ -94,7 +80,6 @@ class FeedbackFile(TypedDict):
     agentId: int
     clientAddress: str
     createdAt: str  # ISO 8601
-    feedbackAuth: str
     score: int
 
     # MAY fields (all optional)

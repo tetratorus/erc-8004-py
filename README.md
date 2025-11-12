@@ -36,16 +36,18 @@ print(f"Agent ID: {result['agentId']}")
 
 ## Contract Addresses
 
-### Sepolia Testnet
+**Important:** All contracts use CREATE2 deterministic deployment. The addresses are **the same on all networks** (localhost, Sepolia, mainnet, etc.):
 
 ```python
 addresses = {
-    'identityRegistry': '0x8004a6090Cd10A7288092483047B097295Fb8847',
-    'reputationRegistry': '0x8004B8FD1A363aa02fDC07635C0c5F94f6Af5B7E',
-    'validationRegistry': '0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5',
-    'chainId': 11155111,
+    'identityRegistry': '0x8004AbdDA9b877187bF865eD1d8B5A41Da3c4997',
+    'reputationRegistry': '0x8004B312333aCb5764597c2BeEe256596B5C6876',
+    'validationRegistry': '0x8004C8AEF64521bC97AB50799d394CDb785885E3',
+    'chainId': 11155111,  # Change based on your network
 }
 ```
+
+The addresses use a vanity prefix `0x8004...` to make them easily recognizable.
 
 ## Core Features
 
@@ -63,32 +65,24 @@ token_uri = client.identity.get_token_uri(agent_id)
 
 ### Reputation & Feedback
 
+**Note:** The new contract version has removed the feedbackAuth mechanism. Anyone can now give feedback directly (except self-feedback).
+
 ```python
-import time
-
-# Create feedback authorization (agent owner signs)
-feedback_auth = client.reputation.create_feedback_auth(
-    agent_id,
-    client_address,
-    index_limit,
-    int(time.time()) + 3600,
-    chain_id,
-    signer_address
-)
-
-signed_auth = client.reputation.sign_feedback_auth(feedback_auth)
-
-# Submit feedback
+# Submit feedback directly (no authorization needed!)
 client.reputation.give_feedback(
     agent_id=agent_id,
     score=95,
-    tag1='excellent-service',
+    tag1='excellent-service',  # Now strings, not bytes32!
     tag2='fast-response',
-    feedback_auth=signed_auth,
 )
 
 # Get reputation summary
 summary = client.reputation.get_summary(agent_id)
+print(f"Average: {summary['averageScore']}, Count: {summary['count']}")
+
+# Read specific feedback (indices start at 1)
+feedback = client.reputation.read_feedback(agent_id, client_address, 1)
+print(f"Score: {feedback['score']}, Tags: {feedback['tag1']}, {feedback['tag2']}")
 ```
 
 ### Validation
@@ -165,14 +159,14 @@ Main client with three sub-clients:
 
 ### ReputationClient
 
-- `create_feedback_auth(...)` - Create feedback authorization
-- `sign_feedback_auth(auth)` - Sign feedback authorization
-- `give_feedback(...)` - Submit feedback
-- `revoke_feedback(agent_id, index)` - Revoke feedback
-- `get_summary(agent_id, ...)` - Get reputation summary
-- `read_feedback(agent_id, client, index)` - Read specific feedback
+- `give_feedback(agent_id, score, tag1, tag2, ...)` - Submit feedback (no auth needed!)
+- `revoke_feedback(agent_id, index)` - Revoke your own feedback
+- `get_summary(agent_id, client_addresses, tag1, tag2)` - Get reputation summary with optional filters
+- `read_feedback(agent_id, client, index)` - Read specific feedback (indices start at 1)
+- `read_all_feedback(agent_id, ...)` - Read all feedback with optional filters
 - `get_clients(agent_id)` - Get all clients who gave feedback
-- `get_last_index(agent_id, client)` - Get last feedback index
+- `get_last_index(agent_id, client)` - Get last feedback index for a client
+- `append_response(...)` - Agent can append response to feedback
 
 ### ValidationClient
 

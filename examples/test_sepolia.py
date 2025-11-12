@@ -1,5 +1,5 @@
 """
-Example script to test ERC-8004 SDK with ChaosChain Sepolia testnet
+Example script to test ERC-8004 SDK with Sepolia testnet
 
 Prerequisites:
 1. Set up environment variables in .env file:
@@ -27,10 +27,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Contract addresses - Sepolia Proxy addresses
-IDENTITY_REGISTRY = "0x8004a6090Cd10A7288092483047B097295Fb8847"
-REPUTATION_REGISTRY = "0x8004B8FD1A363aa02fDC07635C0c5F94f6Af5B7E"
-VALIDATION_REGISTRY = "0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5"
+# Contract addresses - CREATE2 vanity addresses (same on all networks)
+IDENTITY_REGISTRY = "0x8004AbdDA9b877187bF865eD1d8B5A41Da3c4997"
+REPUTATION_REGISTRY = "0x8004B312333aCb5764597c2BeEe256596B5C6876"
+VALIDATION_REGISTRY = "0x8004C8AEF64521bC97AB50799d394CDb785885E3"
 
 # Base58 alphabet for CIDv0 encoding
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -68,7 +68,7 @@ def generate_random_cidv0() -> str:
 
 
 def main():
-    print("🚀 ERC-8004 SDK Test with ChaosChain Sepolia\n")
+    print("🚀 ERC-8004 SDK Test with Sepolia\n")
 
     # Connect to Sepolia
     print("Connecting to Sepolia...")
@@ -137,16 +137,31 @@ def main():
         print(f"✅ Registered agent ID: {agent_id}")
         print(f"   TX Hash: {result['txHash']}")
         print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{result['txHash']}")
-        print(f"   Owner: {client.identity.get_owner(agent_id)}")
-        print(f"   URI: {client.identity.get_token_uri(agent_id)}")
+
+        try:
+            owner = client.identity.get_owner(agent_id)
+            print(f"   Owner: {owner}")
+        except Exception as e:
+            print(f"   ⚠️  get_owner failed: {e}")
+
+        try:
+            uri = client.identity.get_token_uri(agent_id)
+            print(f"   URI: {uri}")
+        except Exception as e:
+            print(f"   ⚠️  get_token_uri failed: {e}")
 
         # Read back metadata
-        agent_name = client.identity.get_metadata(agent_id, "agentName")
-        agent_wallet = client.identity.get_metadata(agent_id, "agentWallet")
-        print(f"   Metadata - agentName: {agent_name}")
-        print(f"   Metadata - agentWallet: {agent_wallet}\n")
+        try:
+            agent_name = client.identity.get_metadata(agent_id, "agentName")
+            agent_wallet = client.identity.get_metadata(agent_id, "agentWallet")
+            print(f"   Metadata - agentName: {agent_name}")
+            print(f"   Metadata - agentWallet: {agent_wallet}\n")
+        except Exception as e:
+            print(f"   ⚠️  get_metadata failed: {e}\n")
     except Exception as error:
-        print(f"❌ Error: {error}")
+        print(f"❌ Error during registration: {error}")
+        import traceback
+        traceback.print_exc()
         return
 
     # Test 1: Set metadata after registration
@@ -160,39 +175,15 @@ def main():
     except Exception as error:
         print(f"❌ Error: {error}\n")
 
-    # Test 2: Create feedbackAuth and submit feedback
-    print("Test 2: Create feedbackAuth and submit feedback")
+    # Test 2: Submit feedback (NO feedbackAuth needed in new contract!)
+    print("Test 2: Submit feedback")
     try:
-
-        # Get chain ID
-        chain_id = client.get_chain_id()
-
-        # Get the last feedback index for the feedback giver
-        last_index = client.reputation.get_last_index(agent_id, feedback_giver_address)
-        print(f"   Last feedback index: {last_index}")
-
-        # Create feedbackAuth (agent owner authorizes feedback giver)
-        feedback_auth = client.reputation.create_feedback_auth(
-            agent_id,
-            feedback_giver_address,
-            last_index + 1,  # Allow next feedback
-            int(time.time()) + 3600,  # Valid for 1 hour
-            chain_id,
-            agent_owner_address
-        )
-        print(f"✅ FeedbackAuth created (indexLimit: {feedback_auth['indexLimit']})")
-
-        # Agent owner signs the feedbackAuth
-        signed_auth = client.reputation.sign_feedback_auth(feedback_auth)
-        print(f"✅ FeedbackAuth signed: {signed_auth[:20]}...")
-
-        # Feedback giver submits feedback
+        # Feedback giver submits feedback directly
         feedback_result = feedback_client.reputation.give_feedback(
             agent_id=agent_id,
             score=95,
             tag1="excellent",
             tag2="reliable",
-            feedback_auth=signed_auth,
         )
         print(f"✅ Feedback submitted!")
         print(f"   Score: 95 / 100")
@@ -200,11 +191,11 @@ def main():
         print(f"   TX Hash: {feedback_result['txHash']}")
         print(f"   🔍 View on Etherscan: https://sepolia.etherscan.io/tx/{feedback_result['txHash']}")
 
-        # Read the feedback back
+        # Read the feedback back (first feedback is at index 1)
         feedback = feedback_client.reputation.read_feedback(
             agent_id,
             feedback_giver_address,
-            last_index + 1  # Use the new index after submission
+            1  # First feedback is at index 1
         )
         print(f"✅ Feedback retrieved:")
         print(f"   Score: {feedback['score']} / 100")

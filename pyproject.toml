@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "erc-8004-py"
-version = "0.1.4"
+version = "1.2.0"
 description = "Python SDK for ERC-8004 Trustless Agents protocol"
 readme = "README.md"
 requires-python = ">=3.8"
